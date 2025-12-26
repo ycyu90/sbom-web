@@ -4,6 +4,61 @@ from fastapi.templating import Jinja2Templates
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
 
+from spdx_tools.spdx.parser.parse_anything import parse_file  # 會依副檔名/內容嘗試解析
+from spdx_tools.spdx.model.document import Document as SpdxDocument
+import tempfile
+import os
+
+def spdx_doc_to_viewmodel(doc: SpdxDocument) -> dict:
+    """
+    將 spdx-tools 的 Document 轉成可丟給 Jinja2 的 dict（MVP 欄位）。
+    """
+    creation = doc.creation_info
+    packages = []
+    for p in doc.packages:
+        # license_declared 可能是 None 或 Expression；保守轉字串
+        packages.append({
+            "spdx_id": p.spdx_id,
+            "name": p.name,
+            "version": p.version,
+            "supplier": str(p.supplier) if p.supplier else None,
+            "download_location": p.download_location,
+            "license_declared": str(p.license_declared) if p.license_declared else None,
+            "license_concluded": str(p.license_concluded) if p.license_concluded else None,
+            "purl": p.external_references[0].locator if (p.external_references and len(p.external_references)>0 and getattr(p.external_references[0], "reference_type", None)) else None
+        })
+
+    return {
+        "spdx_version": doc.spdx_version,
+        "data_license": doc.data_license,
+        "document_namespace": doc.document_namespace,
+        "document_name": creation.document_name if creation else None,
+        "created": creation.created.isoformat() if creation and creation.created else None,
+        "creators": [str(c) for c in creation.creators] if creation and creation.creators else [],
+        "packages": packages,
+    }
+
+def parse_spdx(upload_filename: str, content: bytes) -> dict:
+    """
+    使用 spdx-tools 解析 SPDX。
+    parse_file() 需要檔案路徑，因此用暫存檔落地（只在 /tmp，處理完即刪）。
+    """
+    suffix = os.path.splitext(upload_filename)[1].lower() or ".txt"
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        doc = parse_file(tmp_path)  # 會依檔案格式解析（RDF/XML、JSON、YAML、Tag/Value 等）:contentReference[oaicite:1]{index=1}
+        return spdx_doc_to_viewmodel(doc)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
@@ -143,15 +198,34 @@ def parse_cyclonedx_xml(xml_bytes: bytes) -> Dict[str, Any]:
 def upload_page(request: Request):
     return templates.TemplateResponse("upload.html", {"request": request})
 
-
 @app.post("/upload", response_class=HTMLResponse)
 async def upload_sbom(request: Request, file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".xml"):
-        raise HTTPException(status_code=400, detail="請上傳 .xml 檔（CycloneDX XML）")
-
+    filename = file.filename or "uploaded"
     content = await file.read()
+
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="檔案太大，請縮小後再上傳（目前限制 5MB）")
 
-    result = parse_cyclonedx_xml(content)
-    return templates.TemplateResponse("report.html", {"request": request, "sbom": result, "filename": file.filename})
+    ext = os.path.splitext(filename)[1].lower()
+
+    # 1) 先嘗試 CycloneDX XML：副檔名 xml 且根節點 <bom> 才當 CycloneDX
+    if ext == ".xml":
+        try:
+            cyclonedx = parse_cyclonedx_xml(content)
+            return templates.TemplateResponse(
+                "report_cyclonedx.html",
+                {"request": request, "sbom": cyclonedx, "filename": filename}
+            )
+        except HTTPException:
+            # 不是 CycloneDX 或解析失敗 → 往下嘗試 SPDX（RDF/XML 也常用 .xml）
+            pass
+
+    # 2) SPDX（可吃 .spdx .rdf .xml .json .yml .yaml .tv .txt 等）
+    try:
+        spdx_vm = parse_spdx(filename, content)
+        return templates.TemplateResponse(
+            "report_spdx.html",
+            {"request": request, "spdx": spdx_vm, "filename": filename}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"無法判斷或解析 SBOM：{e}")

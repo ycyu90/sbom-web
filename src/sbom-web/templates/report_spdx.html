@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>SPDX 報告</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { text-align: left; }
+    code { background: #f6f6f6; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <p><a href="/">← 回上傳頁</a></p>
+  <h1>SPDX 報告</h1>
+  <p>檔名：<code>{{ filename }}</code></p>
+
+  <h2>Document 摘要</h2>
+  <ul>
+    <li>SPDX Version：<code>{{ spdx.spdx_version }}</code></li>
+    <li>Data License：<code>{{ spdx.data_license }}</code></li>
+    <li>Document Name：<code>{{ spdx.document_name }}</code></li>
+    <li>Document Namespace：<code>{{ spdx.document_namespace }}</code></li>
+    <li>Created：<code>{{ spdx.created }}</code></li>
+  </ul>
+
+  <h3>Creators</h3>
+  {% if spdx.creators and spdx.creators|length > 0 %}
+    <ul>{% for c in spdx.creators %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% else %}
+    <p>（無）</p>
+  {% endif %}
+
+  <h2>Packages（{{ spdx.packages|length }}）</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>SPDXID</th>
+        <th>Name</th>
+        <th>Version</th>
+        <th>Supplier</th>
+        <th>DownloadLocation</th>
+        <th>LicenseDeclared</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in spdx.packages %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><code>{{ p.spdx_id }}</code></td>
+        <td><code>{{ p.name }}</code></td>
+        <td><code>{{ p.version }}</code></td>
+        <td>{{ p.supplier }}</td>
+        <td><code>{{ p.download_location }}</code></td>
+        <td><code>{{ p.license_declared }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
