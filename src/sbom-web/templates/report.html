@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>SBOM 報告</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { text-align: left; }
+    code { background: #f6f6f6; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <p><a href="/">← 回上傳頁</a></p>
+
+  <h1>SBOM 報告</h1>
+  <p>檔名：<code>{{ filename }}</code></p>
+
+  <h2>Bom 基本資訊</h2>
+  <ul>
+    <li>serialNumber：<code>{{ sbom.serialNumber }}</code></li>
+    <li>version：<code>{{ sbom.version }}</code></li>
+  </ul>
+
+  <h2>Metadata</h2>
+  <ul>
+    <li>timestamp：<code>{{ sbom.metadata.timestamp }}</code></li>
+  </ul>
+
+  <h3>Tools</h3>
+  {% if sbom.metadata.tools and sbom.metadata.tools|length > 0 %}
+  <ul>
+    {% for t in sbom.metadata.tools %}
+      <li>{{ t.vendor or "" }} {{ t.name or "" }} {{ t.version or "" }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+    <p>（無）</p>
+  {% endif %}
+
+  <h3>Metadata Component</h3>
+  {% if sbom.metadata.component %}
+    <ul>
+      <li>type：<code>{{ sbom.metadata.component["type"] }}</code></li>
+      <li>bom-ref：<code>{{ sbom.metadata.component["bom-ref"] }}</code></li>
+      <li>name：<code>{{ sbom.metadata.component["name"] }}</code></li>
+      <li>version：<code>{{ sbom.metadata.component["version"] }}</code></li>
+      <li>purl：<code>{{ sbom.metadata.component["purl"] }}</code></li>
+    </ul>
+  {% else %}
+    <p>（無）</p>
+  {% endif %}
+
+  <h2>Components（{{ sbom.components|length }}）</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>type</th>
+        <th>name</th>
+        <th>version</th>
+        <th>purl</th>
+        <th>bom-ref</th>
+        <th>licenses</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in sbom.components %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ c.type }}</td>
+        <td><code>{{ c.name }}</code></td>
+        <td><code>{{ c.version }}</code></td>
+        <td><code>{{ c.purl }}</code></td>
+        <td><code>{{ c["bom-ref"] }}</code></td>
+        <td>
+          {% if c.licenses and c.licenses|length > 0 %}
+            <ul>{% for l in c.licenses %}<li>{{ l }}</li>{% endfor %}</ul>
+          {% else %}
+            （無）
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Dependencies（{{ sbom.dependencies|length }}）</h2>
+  {% if sbom.dependencies|length > 0 %}
+  <table>
+    <thead>
+      <tr>
+        <th>ref</th>
+        <th>dependsOn</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in sbom.dependencies %}
+      <tr>
+        <td><code>{{ d.ref }}</code></td>
+        <td>
+          {% if d.dependsOn and d.dependsOn|length > 0 %}
+            <ul>{% for x in d.dependsOn %}<li><code>{{ x }}</code></li>{% endfor %}</ul>
+          {% else %}
+            （無）
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>（無）</p>
+  {% endif %}
+
+</body>
+</html>

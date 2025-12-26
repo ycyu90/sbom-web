@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>SBOM 解析器（CycloneDX XML）</title>
+</head>
+<body>
+  <h1>SBOM 解析器（CycloneDX XML）</h1>
+  <form action="/upload" method="post" enctype="multipart/form-data">
+    <p>
+      <input type="file" name="file" accept=".xml" required />
+      <button type="submit">上傳並解析</button>
+    </p>
+  </form>
+  <p>限制：XML 檔案，最大 5MB。</p>
+</body>
+</html>
